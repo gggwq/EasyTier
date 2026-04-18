@@ -68,6 +68,8 @@ export interface DeviceInfo {
     running_network_instances?: Array<string>;
     machine_id: string;
     location: Location | undefined;
+    is_online: boolean;
+    virtual_ip?: string;
 }
 
 export function buildDeviceInfo(device: any): DeviceInfo {
@@ -80,6 +82,8 @@ export function buildDeviceInfo(device: any): DeviceInfo {
         easytier_version: device.info?.easytier_version,
         machine_id: UuidToStr(device.info?.machine_id),
         location: device.location,
+        is_online: true,
+        virtual_ip: device.virtual_ip,
     };
 
     return dev_info;

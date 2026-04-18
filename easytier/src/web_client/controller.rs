@@ -48,6 +48,15 @@ impl Controller {
         self.device_os.clone()
     }
 
+    pub fn get_primary_virtual_ip(&self) -> Option<String> {
+        self.manager
+            .list_network_instance_ids()
+            .first()
+            .and_then(|inst_id| self.manager.get_instance_config_control(inst_id).ok())
+            .and_then(|config| config.get_ipv4())
+            .map(|ipv4| ipv4.address().to_string())
+    }
+
     pub fn register_api_rpc_service(&self, registry: &ServiceRegistry) {
         register_api_rpc_service(&self.manager, registry, Some(self.hooks.clone()));
     }

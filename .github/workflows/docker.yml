@@ -6,7 +6,6 @@ on:
       run_id:
         description: 'The run id of EasyTier-Core Action in EasyTier repo'
         type: number
-        default: 10228239965
         required: true
       image_tag:
         description: 'Tag for this image build'
@@ -26,7 +25,7 @@ on:
 
 jobs:
   docker:
-    if: contains('["KKRainbow"]', github.actor)
+    timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
       -

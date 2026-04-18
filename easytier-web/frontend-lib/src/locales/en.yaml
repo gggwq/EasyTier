@@ -315,6 +315,9 @@ web:
     version: Version
     machine_id: Machine ID
     unknown_location: Unknown Location
+    delete_confirm: Are you sure you want to remove device "{hostname}" from the list? This will not affect the actual device.
+    delete_success: Device Removed
+    delete_online_not_allowed: Cannot delete online device. Only offline devices can be removed.
     
   device_management:
     edit_network: Edit Network

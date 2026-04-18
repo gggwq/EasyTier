@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
-import { Button, Drawer, ProgressSpinner, useToast, InputSwitch, Popover, Dropdown, Toolbar } from 'primevue';
+import { Button, Drawer, ProgressSpinner, useToast, InputSwitch, Popover, Dropdown, Toolbar, ConfirmDialog, useConfirm } from 'primevue';
 import Tooltip from 'primevue/tooltip';
 import { useRoute, useRouter } from 'vue-router';
 import { Utils } from 'easytier-frontend-lib';
@@ -30,6 +30,31 @@ watch(showDetailedView, (newValue) => {
 });
 
 const api = props.api;
+const confirm = useConfirm();
+
+// 已知设备列表（包含离线设备）
+const knownDevices = ref<Array<Utils.DeviceInfo>>([]);
+
+// 从 localStorage 加载已知设备
+const loadKnownDevices = () => {
+    try {
+        const saved = localStorage.getItem('deviceList.knownDevices');
+        if (saved) {
+            knownDevices.value = JSON.parse(saved);
+        }
+    } catch (e) {
+        console.error('Failed to load known devices:', e);
+    }
+};
+
+// 保存已知设备到 localStorage
+const saveKnownDevices = () => {
+    try {
+        localStorage.setItem('deviceList.knownDevices', JSON.stringify(knownDevices.value));
+    } catch (e) {
+        console.error('Failed to save known devices:', e);
+    }
+};
 
 const deviceList = ref<Array<Utils.DeviceInfo> | undefined>(undefined);
 
@@ -42,11 +67,41 @@ const toast = useToast();
 const loadDevices = async () => {
     const resp = await api?.list_machines();
     let devices: Array<Utils.DeviceInfo> = [];
+    const onlineMachineIds = new Set<string>();
+    
     for (const device of (resp || [])) {
-        devices.push(Utils.buildDeviceInfo(device));
+        const devInfo = Utils.buildDeviceInfo(device);
+        devices.push(devInfo);
+        onlineMachineIds.add(devInfo.machine_id);
     }
-    console.debug("device list", deviceList.value);
-    deviceList.value = devices;
+    
+    // 合并已知设备列表，标记离线状态
+    const mergedDevices: Array<Utils.DeviceInfo> = [];
+    const currentDeviceMap = new Map(devices.map(d => [d.machine_id, d]));
+    
+    // 先添加所有当前在线设备
+    for (const device of devices) {
+        mergedDevices.push(device);
+    }
+    
+    // 再添加已知但离线的设备
+    for (const knownDevice of knownDevices.value) {
+        if (!onlineMachineIds.has(knownDevice.machine_id)) {
+            // 标记为离线，但保留信息
+            mergedDevices.push({
+                ...knownDevice,
+                is_online: false,
+                running_network_count: 0,
+            });
+        }
+    }
+    
+    // 更新已知设备列表（只保留当前在线的）
+    knownDevices.value = devices;
+    saveKnownDevices();
+    
+    console.debug("device list", mergedDevices);
+    deviceList.value = mergedDevices;
 };
 
 const periodFunc = new Utils.PeriodicTask(async () => {
@@ -59,6 +114,8 @@ const periodFunc = new Utils.PeriodicTask(async () => {
 }, 1000);
 
 onMounted(async () => {
+    // 先加载已知设备
+    loadKnownDevices();
     periodFunc.start();
     // 初始化屏幕尺寸相关变量
     handleResize();
@@ -99,6 +156,32 @@ const handleDeviceManagement = (device: Utils.DeviceInfo) => {
 const showDeviceDetails = (device: Utils.DeviceInfo, event: Event) => {
     selectedDevice.value = device;
     detailPopover.value.toggle(event);
+};
+
+// 删除设备（仅允许删除离线设备）
+const handleDeleteDevice = (device: Utils.DeviceInfo, event: Event) => {
+    // 不允许删除在线设备
+    if (device.is_online !== false) {
+        toast.add({ severity: 'warn', summary: t('web.device.delete_online_not_allowed'), detail: device.hostname, life: 3000 });
+        return;
+    }
+    
+    confirm.require({
+        target: event.currentTarget as HTMLElement,
+        message: t('web.device.delete_confirm', { hostname: device.hostname }),
+        icon: 'pi pi-exclamation-triangle',
+        acceptClass: 'p-button-danger',
+        accept: () => {
+            // 从已知设备列表中移除
+            knownDevices.value = knownDevices.value.filter(d => d.machine_id !== device.machine_id);
+            saveKnownDevices();
+            // 从当前列表中移除
+            if (deviceList.value) {
+                deviceList.value = deviceList.value.filter(d => d.machine_id !== device.machine_id);
+            }
+            toast.add({ severity: 'success', summary: t('web.device.delete_success'), detail: device.hostname, life: 3000 });
+        },
+    });
 };
 
 // 检查是否为桌面设备
@@ -160,9 +243,12 @@ const sortDevices = (devices: Array<Utils.DeviceInfo> | undefined) => {
     });
 };
 
-// 排序后的设备列表
+// 排序后的设备列表（在线设备优先，离线设备在后）
 const sortedDeviceList = computed(() => {
-    return sortDevices(deviceList.value);
+    if (!deviceList.value) return [];
+    const online = deviceList.value.filter(d => d.is_online !== false);
+    const offline = deviceList.value.filter(d => d.is_online === false);
+    return [...sortDevices(online), ...sortDevices(offline)];
 });
 
 // 保存resize事件处理函数的引用，以便正确移除
@@ -201,6 +287,58 @@ const handleResize = () => {
 .device-card:hover {
     transform: translateY(-2px);
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+/* 离线设备卡片样式 */
+.device-card.offline {
+    opacity: 0.7;
+    background-color: var(--surface-ground, #f3f4f6);
+}
+
+.device-card.offline:hover {
+    opacity: 0.85;
+}
+
+/* 离线徽章样式 */
+.offline-badge {
+    position: absolute;
+    top: 0;
+    right: 0;
+    background-color: #ef4444;
+    color: white;
+    font-size: 0.7rem;
+    padding: 0.2rem 0.5rem;
+    border-bottom-left-radius: 0.25rem;
+    display: flex;
+    align-items: center;
+}
+
+/* 虚拟 IP 样式 */
+.virtual-ip {
+    background-color: var(--primary-color-light, #dbeafe);
+    color: var(--primary-color, #3b82f6);
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    font-size: 0.85rem;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    width: fit-content;
+}
+
+@media (prefers-color-scheme: dark) {
+    .device-card.offline {
+        background-color: var(--surface-ground, #1e293b);
+    }
+
+    .offline-badge {
+        background-color: #dc2626;
+    }
+
+    .virtual-ip {
+        background-color: rgba(59, 130, 246, 0.2);
+        color: #93c5fd;
+    }
 }
 
 .card-header {
@@ -743,7 +881,12 @@ const handleResize = () => {
         <div v-if="deviceList !== undefined">
             <!-- 卡片视图 (适用于所有屏幕尺寸) -->
             <div class="card-container">
-                <div v-for="device in sortedDeviceList" :key="device.machine_id" class="device-card">
+                <div v-for="device in sortedDeviceList" :key="device.machine_id" class="device-card" :class="{ 'offline': device.is_online === false }">
+                    <!-- 离线标记 -->
+                    <div v-if="device.is_online === false" class="offline-badge">
+                        <i class="pi pi-ban mr-1"></i>{{ t('web.device.offline') }}
+                    </div>
+
                     <!-- 卡片头部 -->
                     <div class="card-header">
                         <!-- 上部区域：设备名称和版本徽章 -->
@@ -757,6 +900,12 @@ const handleResize = () => {
                             <div class="text-xs version-badge" v-tooltip="`EasyTier ${device.easytier_version}`">
                                 v{{ device.easytier_version.split('-')[0] }}
                             </div>
+                        </div>
+
+                        <!-- 虚拟 IP 区域 -->
+                        <div v-if="device.virtual_ip" class="virtual-ip mb-2">
+                            <i class="pi pi-network mr-1"></i>
+                            <span class="text-sm">{{ device.virtual_ip }}</span>
                         </div>
 
                         <!-- 下部区域：IP地址和操作按钮 -->
@@ -799,6 +948,11 @@ const handleResize = () => {
                                 <!-- 设置按钮 -->
                                 <Button icon="pi pi-cog" @click="handleDeviceManagement(device)" severity="secondary"
                                     rounded class="w-9 h-9" :title="`Manage ${device.hostname}`" />
+
+                                <!-- 删除按钮（仅离线设备可用） -->
+                                <Button icon="pi pi-trash" @click="handleDeleteDevice(device, $event)" severity="danger"
+                                    text rounded class="w-9 h-9" :title="t('web.device.delete')" 
+                                    :disabled="device.is_online !== false" />
                             </div>
                         </div>
                     </div>
@@ -839,5 +993,8 @@ const handleResize = () => {
                 </div>
             </template>
         </Drawer>
+
+        <!-- 删除确认对话框 -->
+        <ConfirmDialog />
     </div>
 </template>

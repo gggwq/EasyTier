@@ -315,6 +315,9 @@ web:
     version: 版本
     machine_id: 机器ID
     unknown_location: 未知位置
+    delete_confirm: 确定要从列表中移除设备 "{hostname}" 吗？这不会影响实际设备。
+    delete_success: 设备已移除
+    delete_online_not_allowed: 无法删除在线设备，只能移除离线设备。
 
   device_management:
     edit_network: 编辑网络

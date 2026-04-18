@@ -31,6 +31,7 @@ permissions:
 
 jobs:
   release:
+    timeout-minutes: 30
     runs-on: ubuntu-latest
     steps:
       -
@@ -73,7 +74,7 @@ jobs:
           cd release_assets
           ls -l -R ./
           chmod -R 755 .
-          for x in `ls`; do
+          for x in $(ls); do
             if [ "$x" = "Easytier-Magisk" ]; then
               # for Easytier-Magisk, make sure files are in the root of the zip
               cd $x;

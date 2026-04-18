@@ -77,7 +77,6 @@ const loadDevices = async () => {
     
     // 合并已知设备列表，标记离线状态
     const mergedDevices: Array<Utils.DeviceInfo> = [];
-    const currentDeviceMap = new Map(devices.map(d => [d.machine_id, d]));
     
     // 先添加所有当前在线设备
     for (const device of devices) {

@@ -226,6 +226,13 @@ impl NetworkInstanceManager {
             .and_then(|instance| instance.value().get_api_service())
     }
 
+    pub fn get_primary_virtual_ip(&self) -> Option<String> {
+        self.instance_map
+            .iter()
+            .next()
+            .and_then(|instance| instance.value().get_ipv4())
+    }
+
     pub fn set_tun_fd(&self, instance_id: &uuid::Uuid, fd: i32) -> Result<(), anyhow::Error> {
         let sender = self
             .instance_map

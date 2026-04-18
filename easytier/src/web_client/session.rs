@@ -99,6 +99,7 @@ impl Session {
                         .into_iter()
                         .map(Into::into)
                         .collect(),
+                    virtual_ip: controller.get_primary_virtual_ip().unwrap_or_default(),
                 };
 
                 match client

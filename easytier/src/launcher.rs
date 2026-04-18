@@ -301,6 +301,10 @@ impl NetworkInstance {
         self.launcher.is_some() && self.launcher.as_ref().unwrap().running()
     }
 
+    pub fn get_ipv4(&self) -> Option<String> {
+        self.config.get_ipv4().map(|ipv4| ipv4.address().to_string())
+    }
+
     pub async fn get_running_info(&self) -> anyhow::Result<NetworkInstanceRunningInfo> {
         let launcher = self.launcher.as_ref().ok_or_else(|| {
             anyhow::anyhow!("instance is not running, please start the instance first")

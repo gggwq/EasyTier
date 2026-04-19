@@ -72,7 +72,7 @@ impl Session {
         let device_os = controller.upgrade().unwrap().device_os();
 
         let ctx_clone = ctx.clone();
-        let mut tick = interval(std::time::Duration::from_secs(1));
+        let mut tick = interval(std::time::Duration::from_secs(3));
         let client = rpc_mgr
             .rpc_client()
             .scoped_client::<WebServerServiceClientFactory<BaseController>>(1, 1, "".to_string());

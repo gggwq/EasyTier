@@ -117,7 +117,7 @@ const periodFunc = new Utils.PeriodicTask(async () => {
         toast.add({ severity: 'error', summary: 'Load Device List Failed', detail: e, life: 2000 });
         console.error(e);
     }
-}, 1000);
+}, 3000);
 
 onMounted(async () => {
     // 先加载已知设备

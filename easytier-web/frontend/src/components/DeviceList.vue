@@ -95,8 +95,15 @@ const loadDevices = async () => {
         }
     }
     
-    // 更新已知设备列表（只保留当前在线的）
-    knownDevices.value = devices;
+    // 更新已知设备列表（保留所有设备，包括离线的）
+    for (const device of devices) {
+        const existingIndex = knownDevices.value.findIndex(d => d.machine_id === device.machine_id);
+        if (existingIndex >= 0) {
+            knownDevices.value[existingIndex] = device;
+        } else {
+            knownDevices.value.push(device);
+        }
+    }
     saveKnownDevices();
     
     console.debug("device list", mergedDevices);

@@ -83,7 +83,7 @@ export function buildDeviceInfo(device: any): DeviceInfo {
         machine_id: UuidToStr(device.info?.machine_id),
         location: device.location,
         is_online: true,
-        virtual_ip: device.virtual_ip,
+        virtual_ip: device.info?.virtual_ip,
     };
 
     return dev_info;
